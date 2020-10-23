@@ -7,6 +7,7 @@
 #include <linux/cpufeature.h>
 #include <asm/coco.h>
 #include <asm/tdx.h>
+#include <asm/cmdline.h>
 #include <asm/i8259.h>
 #include <asm/apic.h>
 #include <asm/idtentry.h>
@@ -961,10 +962,14 @@ void __init tdx_early_init(void)
 	u64 cc_mask;
 	u32 eax, sig[3];
 
-	cpuid_count(TDX_CPUID_LEAF_ID, 0, &eax, &sig[0], &sig[2],  &sig[1]);
+	if (cmdline_find_option_bool(boot_command_line, "force_tdx_guest")) {
+		pr_info("Force enabling TDX Guest feature\n");
+	} else {
+		cpuid_count(TDX_CPUID_LEAF_ID, 0, &eax, &sig[0], &sig[2],  &sig[1]);
 
-	if (memcmp(TDX_IDENT, sig, sizeof(sig)))
-		return;
+		if (memcmp(TDX_IDENT, sig, sizeof(sig)))
+			return;
+	}
 
 	setup_force_cpu_cap(X86_FEATURE_TDX_GUEST);
 	setup_clear_cpu_cap(X86_FEATURE_MCE);

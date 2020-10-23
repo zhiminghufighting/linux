@@ -63,14 +63,19 @@ static inline void tdx_outw(u16 value, u16 port)
 }
 
 static int tdx_guest = -1;
+int cmdline_find_option_bool(const char *option);
+
 void early_tdx_detect(void)
 {
 	u32 eax, sig[3];
 
-	cpuid_count(TDX_CPUID_LEAF_ID, 0, &eax, &sig[0], &sig[2],  &sig[1]);
+	if (!cmdline_find_option_bool("force_tdx_guest")) {
+		cpuid_count(TDX_CPUID_LEAF_ID, 0, &eax,
+			    &sig[0], &sig[2],  &sig[1]);
 
-	if (memcmp(TDX_IDENT, sig, sizeof(sig)))
-		return;
+		if (memcmp(TDX_IDENT, sig, sizeof(sig)))
+			return;
+	}
 
 	/* Use hypercalls instead of I/O instructions */
 	pio_ops.f_inb  = tdx_inb;
