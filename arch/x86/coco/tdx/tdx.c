@@ -24,6 +24,7 @@
 
 /* TDX hypercall Leaf IDs */
 #define TDVMCALL_MAP_GPA		0x10001
+#define TDVMCALL_GET_QUOTE		0x10002
 
 /* MMIO direction */
 #define EPT_READ	0
@@ -45,6 +46,11 @@
 #define TDCALL_SUCCESS			0x0
 #define TDCALL_INVALID_OPERAND		0x8000000000000000
 #define TDCALL_OPERAND_BUSY		0x8000020000000000
+
+/* TDX hypercall error codes */
+#define TDVMCALL_SUCCESS		0x0
+#define TDVMCALL_INVALID_OPERAND	0x8000000000000000
+#define TDVMCALL_GPA_IN_USE		0x8000000000000001
 
 /*
  * Wrapper for standard use of __tdx_hypercall with no output aside from
@@ -151,6 +157,45 @@ int tdx_mcall_tdreport(u64 data, u64 reportdata)
 	return -EIO;
 }
 EXPORT_SYMBOL_GPL(tdx_mcall_tdreport);
+
+/*
+ * tdx_hcall_get_quote() - Generate TDQUOTE using TDREPORT_STRUCT.
+ *
+ * @data        : Physical address of 4KB GPA memory which contains
+ *                TDREPORT_STRUCT.
+ *
+ * return 0 on success or failure error number.
+ */
+int tdx_hcall_get_quote(u64 data)
+{
+	u64 ret;
+
+	/*
+	 * Use confidential guest TDX check to ensure this API is only
+	 * used by TDX guest platforms.
+	 */
+	if (!data || !cpu_feature_enabled(X86_FEATURE_TDX_GUEST))
+		return -EINVAL;
+
+	/*
+	 * Pass the physical address of tdreport data to the VMM
+	 * and trigger the tdquote generation. Quote data will be
+	 * stored back in the same physical address space. More info
+	 * about ABI can be found in TDX Guest-Host-Communication
+	 * Interface (GHCI), sec 3.3.
+	 */
+	ret = _tdx_hypercall(TDVMCALL_GET_QUOTE, data, 0, 0, 0);
+
+	if (ret == TDVMCALL_SUCCESS)
+		return 0;
+	else if (ret == TDVMCALL_INVALID_OPERAND)
+		return -EINVAL;
+	else if (ret == TDVMCALL_GPA_IN_USE)
+		return -EBUSY;
+
+	return -EIO;
+}
+EXPORT_SYMBOL_GPL(tdx_hcall_get_quote);
 
 static u64 get_cc_mask(void)
 {
