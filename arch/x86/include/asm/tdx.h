@@ -48,6 +48,8 @@ void tdx_safe_halt(void);
 
 bool tdx_early_handle_ve(struct pt_regs *regs);
 
+int tdx_mcall_tdreport(u64 data, u64 reportdata);
+
 #else
 
 static inline void tdx_early_init(void) { };
