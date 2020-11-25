@@ -8,6 +8,10 @@
 #include <asm/coco.h>
 #include <asm/tdx.h>
 #include <asm/i8259.h>
+#include <asm/apic.h>
+#include <asm/idtentry.h>
+#include <asm/irq_regs.h>
+#include <asm/desc.h>
 #include <asm/vmx.h>
 #include <asm/insn.h>
 #include <asm/insn-eval.h>
@@ -52,6 +56,14 @@
 #define TDVMCALL_SUCCESS		0x0
 #define TDVMCALL_INVALID_OPERAND	0x8000000000000000
 #define TDVMCALL_GPA_IN_USE		0x8000000000000001
+
+/*
+ * Currently it will be used only by the attestation
+ * driver. So, race condition with read/write operation
+ * is not considered.
+ */
+void (*tdx_event_notify_handler)(void);
+EXPORT_SYMBOL_GPL(tdx_event_notify_handler);
 
 /*
  * Wrapper for standard use of __tdx_hypercall with no output aside from
@@ -104,6 +116,28 @@ long tdx_kvm_hypercall(unsigned int nr, unsigned long p1, unsigned long p2,
 }
 EXPORT_SYMBOL_GPL(tdx_kvm_hypercall);
 #endif
+
+/* TDX guest event notification handler */
+DEFINE_IDTENTRY_SYSVEC(sysvec_tdx_event_notify)
+{
+	struct pt_regs *old_regs = set_irq_regs(regs);
+
+	inc_irq_stat(irq_tdx_event_notify_count);
+
+	if (tdx_event_notify_handler)
+		tdx_event_notify_handler();
+
+	/*
+	 * The hypervisor requires that the APIC EOI should be acked.
+	 * If the APIC EOI is not acked, the APIC ISR bit for the
+	 * TDX_GUEST_EVENT_NOTIFY_VECTOR will not be cleared and then it
+	 * will block the interrupt whose vector is lower than
+	 * TDX_GUEST_EVENT_NOTIFY_VECTOR.
+	 */
+	ack_APIC_irq();
+
+	set_irq_regs(old_regs);
+}
 
 /*
  * Used for TDX guests to make calls directly to the TD module.  This
@@ -937,6 +971,12 @@ void __init tdx_early_init(void)
 	x86_platform.guest.enc_status_change_finish = tdx_enc_status_changed;
 
 	legacy_pic = &null_legacy_pic;
+
+	alloc_intr_gate(TDX_GUEST_EVENT_NOTIFY_VECTOR,
+			asm_sysvec_tdx_event_notify);
+
+	if (tdx_hcall_set_notify_intr(TDX_GUEST_EVENT_NOTIFY_VECTOR))
+		pr_warn("Setting event notification interrupt failed\n");
 
 	pr_info("Guest detected\n");
 }
