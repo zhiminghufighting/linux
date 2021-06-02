@@ -12,6 +12,7 @@
 #include <linux/swiotlb.h>
 #include <linux/cc_platform.h>
 #include <linux/mem_encrypt.h>
+#include <asm/cpufeature.h>
 
 /* Override for DMA direct allocation check - ARCH_HAS_FORCE_DMA_UNENCRYPTED */
 bool force_dma_unencrypted(struct device *dev)
@@ -85,4 +86,10 @@ void __init mem_encrypt_init(void)
 	swiotlb_update_mem_attributes();
 
 	print_mem_encrypt_feature_info();
+}
+
+int arch_has_restricted_virtio_memory_access(void)
+{
+	return cc_platform_has(CC_ATTR_GUEST_MEM_ENCRYPT) ||
+		cpu_feature_enabled(X86_FEATURE_TDX_GUEST);
 }
