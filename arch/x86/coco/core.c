@@ -16,8 +16,26 @@
 static enum cc_vendor vendor __ro_after_init;
 static u64 cc_mask __ro_after_init;
 
+#ifdef CONFIG_INTEL_TDX_GUEST
+
+unsigned int x86_disable_cc = -1;
+
+static int __init x86_cc_clear_setup(char *arg)
+{
+	get_option(&arg, &x86_disable_cc);
+
+	return 1;
+}
+__setup("x86_cc_clear=", x86_cc_clear_setup);
+
+#endif
+
 static bool intel_cc_platform_has(enum cc_attr attr)
 {
+#ifdef CONFIG_INTEL_TDX_GUEST
+	if (attr == x86_disable_cc)
+		return false;
+
 	switch (attr) {
 	case CC_ATTR_GUEST_UNROLL_STRING_IO:
 	case CC_ATTR_HOTPLUG_DISABLED:
@@ -27,6 +45,9 @@ static bool intel_cc_platform_has(enum cc_attr attr)
 	default:
 		return false;
 	}
+#else
+	return false;
+#endif
 }
 
 /*
