@@ -1027,6 +1027,7 @@ static inline void __free_one_page(struct page *page,
 	unsigned long combined_pfn;
 	struct page *buddy;
 	bool to_tail;
+	bool offline = PageOffline(page);
 
 	VM_BUG_ON(!zone_is_initialized(zone));
 	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
@@ -1072,6 +1073,10 @@ static inline void __free_one_page(struct page *page,
 			clear_page_guard(zone, buddy, order, migratetype);
 		else
 			del_page_from_free_list(buddy, zone, order);
+
+		if (PageOffline(buddy))
+			offline = true;
+
 		combined_pfn = buddy_pfn & pfn;
 		page = page + (combined_pfn - pfn);
 		pfn = combined_pfn;
@@ -1080,6 +1085,10 @@ static inline void __free_one_page(struct page *page,
 
 done_merging:
 	set_buddy_order(page, order);
+
+	/* Mark page PageOffline() if any merged page was PageOffline() */
+	if (offline)
+		__SetPageOffline(page);
 
 	if (fpi_flags & FPI_TO_TAIL)
 		to_tail = true;
@@ -1164,7 +1173,8 @@ out:
 static inline bool page_expected_state(struct page *page,
 					unsigned long check_flags)
 {
-	if (unlikely(atomic_read(&page->_mapcount) != -1))
+	if (unlikely(atomic_read(&page->_mapcount) != -1) &&
+	    !PageOffline(page))
 		return false;
 
 	if (unlikely((unsigned long)page->mapping |
@@ -1729,6 +1739,8 @@ void __init memblock_free_pages(struct page *page, unsigned long pfn,
 {
 	if (early_page_uninitialised(pfn))
 		return;
+
+	maybe_set_page_offline(page, order);
 	__free_pages_core(page, order);
 }
 
@@ -1818,10 +1830,12 @@ static void __init deferred_free_range(unsigned long pfn,
 	if (nr_pages == pageblock_nr_pages &&
 	    (pfn & (pageblock_nr_pages - 1)) == 0) {
 		set_pageblock_migratetype(page, MIGRATE_MOVABLE);
+		maybe_set_page_offline(page, pageblock_order);
 		__free_pages_core(page, pageblock_order);
 		return;
 	}
 
+	accept_memory(pfn << PAGE_SHIFT, (pfn + nr_pages) << PAGE_SHIFT);
 	for (i = 0; i < nr_pages; i++, page++, pfn++) {
 		if ((pfn & (pageblock_nr_pages - 1)) == 0)
 			set_pageblock_migratetype(page, MIGRATE_MOVABLE);
@@ -2281,6 +2295,10 @@ static inline void expand(struct zone *zone, struct page *page,
 		if (set_page_guard(zone, &page[size], high, migratetype))
 			continue;
 
+		/* Transfer PageOffline() to newly split pages */
+		if (PageOffline(page))
+			__SetPageOffline(&page[size]);
+
 		add_to_free_list(&page[size], zone, high, migratetype);
 		set_buddy_order(&page[size], high);
 	}
@@ -2410,6 +2428,9 @@ inline void post_alloc_hook(struct page *page, unsigned int order,
 	 * allocations and the page unpoisoning code will complain.
 	 */
 	kernel_unpoison_pages(page, 1 << order);
+
+	if (PageOffline(page))
+		accept_and_clear_page_offline(page, order);
 
 	/*
 	 * As memory initialization might be integrated into KASAN,

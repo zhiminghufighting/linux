@@ -860,5 +860,19 @@ void free_zone_device_page(struct page *page);
 struct folio *try_grab_folio(struct page *page, int refs, unsigned int flags);
 
 DECLARE_PER_CPU(struct per_cpu_nodestat, boot_nodestats);
+#ifndef CONFIG_UNACCEPTED_MEMORY
+static inline void maybe_set_page_offline(struct page *page, unsigned int order)
+{
+}
+
+static inline void accept_and_clear_page_offline(struct page *page,
+						 unsigned int order)
+{
+}
+
+static inline void accept_memory(phys_addr_t start, phys_addr_t end)
+{
+}
+#endif
 
 #endif	/* __MM_INTERNAL_H */
