@@ -9,6 +9,7 @@
 #include <uapi/asm/vmx.h>
 
 #include <asm/shared/tdx.h>
+#include <asm/page_types.h>
 
 /* Called from __tdx_hypercall() for unrecoverable failure */
 void __tdx_hypercall_failed(void)
@@ -61,6 +62,7 @@ static inline void tdx_outw(u16 value, u16 port)
 	tdx_io_out(2, port, value);
 }
 
+static int tdx_guest = -1;
 void early_tdx_detect(void)
 {
 	u32 eax, sig[3];
@@ -74,4 +76,45 @@ void early_tdx_detect(void)
 	pio_ops.f_inb  = tdx_inb;
 	pio_ops.f_outb = tdx_outb;
 	pio_ops.f_outw = tdx_outw;
+
+	tdx_guest = 1;
+}
+
+bool early_is_tdx_guest(void)
+{
+	if (tdx_guest < 0)
+		early_tdx_detect();
+
+	return !!tdx_guest;
+}
+
+#define TDACCEPTPAGE		6
+#define TDVMCALL_MAP_GPA	0x10001
+
+void tdx_accept_memory(phys_addr_t start, phys_addr_t end)
+{
+	int i;
+	struct tdx_hypercall_args args = {
+		.r10 = TDX_HYPERCALL_STANDARD,
+		.r11 = TDVMCALL_MAP_GPA,
+		.r12 = start,
+		.r13 = end - start,
+		.r14 = 0,
+		.r15 = 0,
+	};
+
+	if (__tdx_hypercall(&args, 0)) {
+		error("Cannot accept memory: MapGPA failed\n");
+	}
+
+	/*
+	 * For shared->private conversion, accept the page using TDACCEPTPAGE
+	 * TDX module call.
+	 */
+	for (i = 0; i < (end - start) / PAGE_SIZE; i++) {
+		if (__tdx_module_call(TDACCEPTPAGE, start + i * PAGE_SIZE,
+				      0, 0, 0, NULL)) {
+			error("Cannot accept memory: page accept failed\n");
+		}
+	}
 }
