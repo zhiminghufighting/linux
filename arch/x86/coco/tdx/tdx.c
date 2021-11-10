@@ -595,6 +595,11 @@ static int virt_exception_kernel(struct pt_regs *regs, struct ve_info *ve)
 	case EXIT_REASON_CPUID:
 		return handle_cpuid(regs, ve);
 	case EXIT_REASON_EPT_VIOLATION:
+		if (!(ve->gpa & cc_mkdec(0))) {
+			panic("#VE due to access to unaccepted memory. "
+			      "GPA: %#llx\n", ve->gpa);
+		}
+
 		return handle_mmio(regs, ve);
 	case EXIT_REASON_IO_INSTRUCTION:
 		return handle_io(regs, ve);
