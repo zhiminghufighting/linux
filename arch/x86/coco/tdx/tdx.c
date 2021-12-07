@@ -598,6 +598,9 @@ static int virt_exception_kernel(struct pt_regs *regs, struct ve_info *ve)
 		return handle_mmio(regs, ve);
 	case EXIT_REASON_IO_INSTRUCTION:
 		return handle_io(regs, ve);
+	case EXIT_REASON_WBINVD:
+		WARN_ONCE(1, "Unexpected WBINVD\n");
+		return true;
 	default:
 		pr_warn("Unexpected #VE: %lld\n", ve->exit_reason);
 		return -EIO;
