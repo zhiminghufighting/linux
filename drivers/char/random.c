@@ -738,6 +738,11 @@ static int __init parse_trust_bootloader(char *arg)
 early_param("random.trust_cpu", parse_trust_cpu);
 early_param("random.trust_bootloader", parse_trust_bootloader);
 
+__init void random_enable_trust_cpu(void)
+{
+	trust_cpu = true;
+}
+
 static int random_pm_notification(struct notifier_block *nb, unsigned long action, void *data)
 {
 	unsigned long flags, entropy = random_get_entropy();
