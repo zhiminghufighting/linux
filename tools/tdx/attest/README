@@ -1,0 +1,42 @@
+Tdx_attest_sample Overview
+Version: 1.0.0
+Table of Contents
+	- Overview
+	- Build Package Dependence
+        - Build
+	- Usage
+
+------------------------------------------------------------------
+|                          Overview                              |
+------------------------------------------------------------------
+ This tdx-attest-test sample code is designed to help tdx VM owner
+ to get the td-report or td-quote of the tdx VM in tdx VM.
+
+------------------------------------------------------------------
+|                     Build Package Dependence                   |
+------------------------------------------------------------------
+ Package Requirements in td guest
+        - protobuf
+        - protobuf-c
+
+------------------------------------------------------------------
+|                            Build                               |
+------------------------------------------------------------------
+ In the sample code directory run "make"
+
+------------------------------------------------------------------
+|                            Usage                               |
+------------------------------------------------------------------
+ Basic Usage: ./tdx-attest-test -help
+
+ Usage:
+
+ tdx_attest[options]
+ Attestation device test utility.
+
+ Options:
+
+  -d, --dump                Dump tdreport/tdquote data
+  -r, --get-tdreport        Get TDREPORT data
+  -g, --gen-quote           Generate TDQUOTE
+  -s, --get-quote-size      Get TDQUOTE size
