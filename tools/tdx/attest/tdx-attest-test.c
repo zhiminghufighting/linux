@@ -58,6 +58,11 @@ struct get_quote_blob_t {
 	uint8_t trans_len[4];
 	uint8_t p_buf[4 * 4 * 1024 - 28];
 };
+
+struct get_quote_ioctl_arg_t {
+    void *p_blob;
+    size_t len;
+};
 #pragma pack(pop)
 
 struct tdx_report_t {
@@ -192,7 +197,11 @@ static int gen_quote(int devfd, bool dump_data)
 	/* Serialization to match qgs protobuf format */
 	qgs__message__request__pack(&request, p_get_quote_blob->p_buf);
 
-	ret = ioctl(devfd, TDX_CMD_GEN_QUOTE, p_get_quote_blob);
+	struct get_quote_ioctl_arg_t arg;
+	arg.p_blob = p_get_quote_blob;
+	arg.len = sizeof(*p_get_quote_blob);
+
+	ret = ioctl(devfd, TDX_CMD_GEN_QUOTE, &arg);
 	if (ret < 0) {
 		printf("TDX_CMD_GEN_QUOTE ioctl() %d failed.\n", ret);
 		goto done;
